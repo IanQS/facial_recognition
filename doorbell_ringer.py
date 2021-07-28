@@ -21,7 +21,7 @@ from imgbb.client import Client as ImgBBClient
 TWILIO_ACCT_SID = "ACd8b426370b26f5af5bcd0cf65b1d51"
 TWILIO_AUTH_TOKEN = "873d4d22093352dca30bddb5e71bc8"
 IMGBB_KEY = "e47cf08090dd72dcee4347291ecea1"
-DEBUG = False
+DEBUG = True
 TWILIO_PHONE_NUMBER_TO_SEND_FROM = "+14439607012"
 USER_TO_SEND_TO = ""
 currentname = "unknown"
@@ -58,7 +58,7 @@ async def upload(image,name):
     return url
 
 def send_mms(img, time):
-    uploaded_img_url = await upload(img, "visitor")
+    uploaded_img_url = asyncio.run(upload(img, "visitor"))
     twilio_client.messages.create(
         to=USER_TO_SEND_TO,
         from_=TWILIO_PHONE_NUMBER_TO_SEND_FROM,
@@ -76,7 +76,8 @@ def get_frame():
         face_bounding_boxes: mostly for debugging (hence hte flag above)
     :return:
     """
-    doorbell_ringer_img = imutils.resize(vs.read(), width=500)
+    frame = vs.read()
+    doorbell_ringer_img = imutils.resize(frame, width=500)
     time = datetime.now()
     fmt_time = f"{time.hour}:{time.minute} {time.day}-{time.month}"
 
@@ -121,6 +122,7 @@ def identify_people(doorbell_faces_encodings, authorized_faces_encodings, img, f
         name = "Unknown"  # if face is not recognized, then print Unknown
 
         # Check to see if any faces were matched
+        
         if True in matches:
             # find the indexes of all matched faces then initialize a
             # dictionary to count the total number of times each face
@@ -144,10 +146,12 @@ def identify_people(doorbell_faces_encodings, authorized_faces_encodings, img, f
                 currentname = name
                 print(currentname)
         else:  # if no match, send off a mms to the owner
+            print("No recognized person!")
             send_mms(img, fmt_time)
 
         # update the list of names
         names.append(name)
+    return names
 
 def debug_faces(boxes, names, frame):
 
@@ -167,7 +171,11 @@ while True:
     doorbell_faces_encodings, doorbell_ringer_img, face_boxes, fmt_time = get_frame()
 
     names = identify_people(doorbell_faces_encodings, authorized_faces_encodings, doorbell_ringer_img, fmt_time)
+    
+    print(f"At the door: {str(names)}")
+    
     if DEBUG:
-        debug_faces(face_boxes, names, doorbell_ringer_img)
-        cv2.imshow("Debugger", doorbell_ringer_img)
-
+        if not names:  # Only display in this case
+            debug_faces(face_boxes, names, doorbell_ringer_img)
+            cv2.imshow("Debugger", doorbell_ringer_img)
+            cv2.waitKey(0)
